@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小天才的课堂助手</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        secondary: '#36CFC9',
+                        success: '#00B42A',
+                        danger: '#F53F3F',
+                        dark: '#1D2129',
+                        light: '#F2F3F5'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .animate-pulse-slow {
+                animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            .shadow-soft {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .text-shadow {
+                text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            }
+            .card-hover {
+                transition: all 0.3s ease;
+            }
+            .card-hover:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            }
+            .volume-bar {
+                transition: height 0.2s ease;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 text-dark flex flex-col h-screen overflow-hidden">
+    <!-- 顶部导航栏 -->
+    <header class="bg-white shadow-sm sticky top-0 z-50 transition-all duration-300">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-microphone text-primary text-2xl"></i>
+                <h1 class="text-xl md:text-2xl font-bold text-primary">小天才的课堂助手</h1>
+            </div>
+            <div class="flex items-center space-x-6">
+                <div id="status-container" class="hidden md:flex items-center">
+                    <span class="text-sm text-gray-500 mr-2">识别状态:</span>
+                    <span id="recognition-status" class="text-sm font-medium text-gray-700">未开始识别</span>
+                </div>
+                <!-- 音量图标及显示 -->
+                <div id="volume-indicator" class="hidden md:flex items-center space-x-2">
+                    <i class="fa fa-volume-up text-primary"></i>
+                    <div class="w-16 h-6 flex items-end justify-center gap-1">
+                        <div class="volume-bar w-2 bg-primary/30 rounded-t" style="height: 20%"></div>
+                        <div class="volume-bar w-2 bg-primary/50 rounded-t" style="height: 40%"></div>
+                        <div class="volume-bar w-2 bg-primary/70 rounded-t" style="height: 60%"></div>
+                        <div class="volume-bar w-2 bg-primary/90 rounded-t" style="height: 80%"></div>
+                        <div class="volume-bar w-2 bg-primary rounded-t" style="height: 100%"></div>
+                    </div>
+                </div>
+                <button id="help-btn" class="text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-question-circle text-lg"></i>
+                </button>
+                <button id="settings-btn" class="text-gray-600 hover:text-primary transition-colors">
+                    <i class="fa fa-cog text-lg"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主要内容区 -->
+    <main class="flex-grow container mx-auto px-4 py-4 md:py-6 overflow-y-auto">
+        <div class="max-w-5xl mx-auto">
+            <!-- 控制面板 -->
+            <div class="bg-white rounded-xl shadow-soft p-4 md:p-6 mb-4 md:mb-6 card-hover">
+                <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-dark">识别控制</h2>
+                        <p class="text-gray-500 text-sm">点击按钮开始或停止语音识别👉🏻</p>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button id="startBtn" class="bg-primary hover:bg-primary/90 text-white px-6 py-3 rounded-lg flex items-center transition-all transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg">
+                            <i class="fa fa-play mr-2"></i>
+                            <span>开始识别</span>
+                        </button>
+                        <button id="saveBtn" class="bg-success hover:bg-success/90 text-white px-6 py-3 rounded-lg flex items-center transition-all transform hover:scale-105 active:scale-95 shadow-md hover:shadow-lg">
+                            <i class="fa fa-save mr-2"></i>
+                            <span>保存文本</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 录音状态指示器 -->
+                <div id="recording-indicator" class="hidden p-3 bg-red-50 border border-red-100 rounded-lg flex items-center text-danger animate-pulse">
+                    <div class="w-3 h-3 bg-danger rounded-full mr-2"></div>
+                    <span>正在识别中...</span>
+                </div>
+            </div>
+
+            <!-- 文本显示区域 -->
+            <div class="bg-white rounded-xl shadow-soft overflow-hidden transition-all hover:shadow-lg mb-4 md:mb-6 flex flex-col h-[30vh] md:h-[35vh]">
+                <div class="p-4 bg-gray-50 border-b flex justify-between items-center">
+                    <div>
+                        <h3 class="font-semibold text-gray-700">识别结果</h3>
+                        <div class="flex items-center text-xs text-gray-500 mt-1">
+                            <span id="char-count">0 个字</span>
+                            <span class="mx-2">|</span>
+                            <span id="last-update">最后更新: 未更新</span>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="copy-btn" class="text-primary hover:text-primary/80 text-sm px-3 py-1.5 rounded border border-primary/20 hover:bg-primary/5 flex items-center transition-colors">
+                            <i class="fa fa-copy mr-1"></i>
+                            <span>复制</span>
+                        </button>
+                        <button id="clear-btn" class="text-gray-600 hover:text-gray-800 text-sm px-3 py-1.5 rounded border border-gray-200 hover:bg-gray-50 flex items-center transition-colors">
+                            <i class="fa fa-trash mr-1"></i>
+                            <span>清空</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="result-container" class="w-full flex-grow p-6 text-gray-800 leading-relaxed overflow-y-auto">
+                    <div class="text-gray-400 italic text-center py-16">
+                        <i class="fa fa-file-text-o text-4xl mb-3 block opacity-30"></i>
+                        <p>识别的文字将显示在这里...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 功能特点 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-4">
+                <div class="bg-white rounded-xl shadow-soft p-4 md:p-6 card-hover">
+                    <div class="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fa fa-bolt text-primary text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">实时转换</h3>
+                    <p class="text-gray-600 text-sm">语音输入实时转换为文字，延迟低至0.5秒，不错过任何重要内容。</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-soft p-4 md:p-6 card-hover">
+                    <div class="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fa fa-check-circle text-success text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">高准确率</h3>
+                    <p class="text-gray-600 text-sm">专为课堂场景优化的识别模型，专业术语识别准确率高达98%。</p>
+                </div>
+                
+                <div class="bg-white rounded-xl shadow-soft p-4 md:p-6 card-hover">
+                    <div class="w-12 h-12 bg-purple-50 rounded-lg flex items-center justify-center mb-4">
+                        <i class="fa fa-magic text-purple-500 text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-2">智能排版</h3>
+                    <p class="text-gray-600 text-sm">自动分段、标点补全，生成格式规范的文本，便于后期整理复习。</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 底部信息 -->
+    <footer class="bg-white border-t py-4">
+        <div class="container mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
+            <p class="text-gray-500 text-sm">北京大学法学院Curacao制作</p>
+            <div class="mt-2 md:mt-0">
+                <button id="contact-btn" class="text-gray-500 hover:text-primary text-sm transition-colors">
+                    联系我
+                </button>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 联系我弹窗 -->
+    <div id="contact-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full p-6 text-center">
+            <i class="fa fa-envelope text-primary text-4xl mb-4"></i>
+            <h3 class="text-xl font-bold mb-2">联系我们</h3>
+            <p class="text-gray-600 mb-4">如有任何问题或建议，请通过以下邮箱联系我们</p>
+            <div class="bg-gray-50 p-3 rounded-lg mb-4">
+                <p id="email-address" class="font-medium">xinguo25@stu.pku.edu.cn</p>
+            </div>
+            <button id="copy-email-btn" class="bg-primary hover:bg-primary/90 text-white px-6 py-2 rounded-lg transition-colors">
+                复制邮箱
+            </button>
+        </div>
+    </div>
+
+    <!-- 帮助弹窗 -->
+    <div id="help-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-xl max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div class="p-6 border-b flex justify-between items-center">
+                <h3 class="text-xl font-bold">使用帮助</h3>
+                <button id="close-help" class="text-gray-500 hover:text-gray-800">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6">
+                <ul class="space-y-3">
+                    <li class="flex items-start">
+                        <i class="fa fa-check-circle text-primary mt-1 mr-2"></i>
+                        <span>点击"开始识别"按钮启动语音识别</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-circle text-primary mt-1 mr-2"></i>
+                        <span>系统会实时将语音转换为文字并显示</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-circle text-primary mt-1 mr-2"></i>
+                        <span>完成后点击"停止识别"结束会话</span>
+                    </li>
+                    <li class="flex items-start">
+                        <i class="fa fa-check-circle text-primary mt-1 mr-2"></i>
+                        <span>可点击"复制"或"保存文本"按钮保存识别结果</span>
+                    </li>
+                </ul>
+                <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                    <h4 class="font-semibold text-primary mb-2">注意事项</h4>
+                    <p class="text-sm text-gray-600">需要修改server.js中的APP_KEY和ACCESS_KEY</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 复制成功提示 -->
+    <div id="copy-toast" class="fixed bottom-6 right-6 bg-dark text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-40">
+        <i class="fa fa-check mr-2"></i>
+        <span>文本已复制到剪贴板</span>
+    </div>
+
+    <!-- 保存成功提示 -->
+    <div id="save-toast" class="fixed bottom-6 right-6 bg-success text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-40">
+        <i class="fa fa-check mr-2"></i>
+        <span>文本已成功保存</span>
+    </div>
+
+    <!-- 复制邮箱提示 -->
+    <div id="email-toast" class="fixed bottom-6 right-6 bg-success text-white px-4 py-2 rounded-lg shadow-lg transform translate-y-20 opacity-0 transition-all duration-300 flex items-center z-40">
+        <i class="fa fa-check mr-2"></i>
+        <span>邮箱已复制到剪贴板</span>
+    </div>
+
+    <script>
+        // WebSocket和录音相关变量
+        let ws;
+        let mediaRecorder;
+        let fullText = '';   // 完整识别文本
+        let stream;          // 音频流对象
+        let isRecording = false;
+        let audioContext;
+        let analyser;
+        let microphone;
+        let dataArray;
+        let animationId;
+
+        // DOM元素
+        const resultContainer = document.getElementById('result-container');
+        const startBtn = document.getElementById('startBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const copyBtn = document.getElementById('copy-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const recordingIndicator = document.getElementById('recording-indicator');
+        const recognitionStatus = document.getElementById('recognition-status');
+        const charCount = document.getElementById('char-count');
+        const lastUpdate = document.getElementById('last-update');
+        const copyToast = document.getElementById('copy-toast');
+        const saveToast = document.getElementById('save-toast');
+        const emailToast = document.getElementById('email-toast');
+        const helpBtn = document.getElementById('help-btn');
+        const helpModal = document.getElementById('help-modal');
+        const closeHelp = document.getElementById('close-help');
+        const contactBtn = document.getElementById('contact-btn');
+        const contactModal = document.getElementById('contact-modal');
+        const copyEmailBtn = document.getElementById('copy-email-btn');
+        const emailAddress = document.getElementById('email-address');
+        const volumeBars = document.querySelectorAll('.volume-bar');
+        const volumeIndicator = document.getElementById('volume-indicator');
+
+        // 更新识别状态显示
+        function updateRecognitionStatus(status) {
+            recognitionStatus.textContent = status;
+            
+            // 根据状态改变颜色
+            switch(status) {
+                case '正在识别':
+                    recognitionStatus.className = 'text-sm font-medium text-danger';
+                    break;
+                case '已完成':
+                    recognitionStatus.className = 'text-sm font-medium text-success';
+                    break;
+                default:
+                    recognitionStatus.className = 'text-sm font-medium text-gray-700';
+            }
+        }
+
+        // 更新字符计数
+        function updateCharCount() {
+            const count = fullText.trim().length;
+            charCount.textContent = `${count} 个字`;
+        }
+
+        // 更新最后修改时间
+        function updateLastUpdateTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            lastUpdate.textContent = `最后更新: ${timeString}`;
+        }
+
+        // 更新完整识别文本
+        function updateFullText(newText) {
+            if (!newText) return;
+            
+            fullText = newText;
+            updateCharCount();
+            updateLastUpdateTime();
+            
+            // 清空现有内容并添加新内容
+            resultContainer.innerHTML = '';
+            
+            // 创建文本容器
+            const textContainer = document.createElement('div');
+            textContainer.className = 'prose max-w-none leading-relaxed';
+            textContainer.textContent = fullText;
+            resultContainer.appendChild(textContainer);
+            
+            resultContainer.scrollTop = resultContainer.scrollHeight;
+        }
+
+        // 连接WebSocket
+        function connectWS() {
+            // 关闭现有连接
+            if (ws) {
+                ws.close();
+            }
+            
+            // 实际应用中替换为真实的WebSocket地址
+            ws = new WebSocket('ws://localhost:3000');
+
+            ws.onopen = () => {
+                console.log('[WS] 连接已建立');
+            };
+            
+            ws.onclose = () => {
+                console.log('[WS] 连接已断开');
+                
+                // 如果正在录音，自动停止
+                if (isRecording) {
+                    stopRecording();
+                }
+            };
+            
+            ws.onerror = (err) => {
+                console.error(`[WS] 错误: ${err}`);
+            };
+
+            ws.onmessage = (event) => {
+                let text = event.data.toString();
+                try {
+                    // 尝试解析JSON数据
+                    const idx = text.indexOf('{');
+                    if (idx >= 0) text = text.slice(idx);
+                    const data = JSON.parse(text);
+
+                    if (data.result && data.result.text) {
+                        updateFullText(data.result.text);
+                    } else if (data.error) {
+                        console.error(`[错误] ${data.error}`);
+                    }
+                } catch (e) {
+                    // 非JSON格式的消息直接作为文本处理
+                    updateFullText(text);
+                }
+            };
+        }
+
+        // 更新音量显示
+        function updateVolumeBars() {
+            if (!analyser) return;
+            
+            analyser.getByteFrequencyData(dataArray);
+            
+            // 计算平均音量
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+            
+            // 将0-255的范围映射到0-100
+            const volume = Math.min(Math.max(0, average / 2.55), 100);
+            
+            // 更新音量条高度
+            volumeBars.forEach((bar, index) => {
+                // 每个条代表20%的音量
+                const threshold = (index + 1) * 20;
+                bar.style.height = volume >= threshold ? `${threshold}%` : '0';
+            });
+            
+            // 继续动画循环
+            if (isRecording) {
+                animationId = requestAnimationFrame(updateVolumeBars);
+            }
+        }
+
+        // 开始录音/识别
+        async function startRecording() {
+            if (isRecording) return;
+            
+            isRecording = true;
+            startBtn.innerHTML = '<i class="fa fa-stop mr-2"></i><span>停止识别</span>';
+            startBtn.classList.remove('bg-primary', 'hover:bg-primary/90');
+            startBtn.classList.add('bg-danger', 'hover:bg-danger/90');
+            
+            // 显示录音指示器和音量图标
+            recordingIndicator.classList.remove('hidden');
+            volumeIndicator.classList.remove('hidden');
+            updateRecognitionStatus('正在识别');
+            
+            // 清空之前的内容
+            fullText = '';
+            resultContainer.innerHTML = '<div class="text-gray-400 italic text-center py-16"><i class="fa fa-circle-o-notch fa-spin text-4xl mb-3 block opacity-30"></i><p>正在识别语音内容...</p></div>';
+            updateCharCount();
+
+            // 确保WebSocket连接
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                console.log('[INFO] 正在连接服务器...');
+                connectWS();
+                // 等待连接建立
+                await new Promise(resolve => {
+                    const checkConnection = () => {
+                        if (ws.readyState === WebSocket.OPEN) {
+                            resolve();
+                        } else {
+                            setTimeout(checkConnection, 100);
+                        }
+                    };
+                    checkConnection();
+                });
+            }
+
+            try {
+                // 获取音频流
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    } 
+                });
+                
+                // 设置音频分析器用于音量检测
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                microphone = audioContext.createMediaStreamSource(stream);
+                microphone.connect(analyser);
+                analyser.fftSize = 32;
+                const bufferLength = analyser.frequencyBinCount;
+                dataArray = new Uint8Array(bufferLength);
+                
+                // 开始更新音量显示
+                updateVolumeBars();
+                
+                // 创建媒体录制器
+                mediaRecorder = new MediaRecorder(stream);
+
+                // 处理录制的数据
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data && e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
+                        e.data.arrayBuffer().then(buf => ws.send(new Uint8Array(buf)));
+                    }
+                };
+
+                // 每200ms发送一次数据
+                mediaRecorder.start(200);
+                console.log('[INFO] 录音已开始');
+            } catch (err) {
+                console.error(`[错误] 无法访问麦克风: ${err.message}`);
+                alert('无法访问麦克风，请确保已授予权限并检查设备是否正常工作。');
+                stopRecording();
+            }
+        }
+
+        // 停止录音/识别
+        function stopRecording() {
+            if (!isRecording) return;
+            
+            isRecording = false;
+            startBtn.innerHTML = '<i class="fa fa-play mr-2"></i><span>开始识别</span>';
+            startBtn.classList.remove('bg-danger', 'hover:bg-danger/90');
+            startBtn.classList.add('bg-primary', 'hover:bg-primary/90');
+            
+            // 隐藏录音指示器
+            recordingIndicator.classList.add('hidden');
+            updateRecognitionStatus('已完成');
+            
+            // 停止音量动画
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            
+            // 重置音量条
+            volumeBars.forEach(bar => {
+                bar.style.height = '0';
+            });
+
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                console.log('[INFO] 录音已停止');
+            }
+            
+            // 停止音频流
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            // 清理音频上下文
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+                analyser = null;
+                microphone = null;
+                dataArray = null;
+            }
+            
+            // 如果没有识别到内容，恢复初始状态
+            if (!fullText.trim()) {
+                resultContainer.innerHTML = '<div class="text-gray-400 italic text-center py-16"><i class="fa fa-file-text-o text-4xl mb-3 block opacity-30"></i><p>识别的文字将显示在这里...</p></div>';
+            }
+        }
+
+        // 复制文本到剪贴板
+        function copyToClipboard() {
+            if (fullText.trim()) {
+                navigator.clipboard.writeText(fullText).then(() => {
+                    // 显示复制成功提示
+                    copyToast.classList.remove('translate-y-20', 'opacity-0');
+                    copyToast.classList.add('translate-y-0', 'opacity-100');
+                    
+                    // 3秒后隐藏提示
+                    setTimeout(() => {
+                        copyToast.classList.add('translate-y-20', 'opacity-0');
+                        copyToast.classList.remove('translate-y-0', 'opacity-100');
+                    }, 3000);
+                }).catch(err => {
+                    console.error(`[错误] 无法复制文本: ${err}`);
+                    alert('复制失败，请手动复制。');
+                });
+            } else {
+                alert('没有可复制的内容');
+            }
+        }
+
+        // 保存文本
+        function saveText() {
+            if (fullText.trim()) {
+                // 创建一个Blob对象
+                const blob = new Blob([fullText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                
+                // 创建一个a标签用于下载
+                const a = document.createElement('a');
+                a.href = url;
+                const now = new Date();
+                const dateString = now.toISOString().slice(0,10).replace(/-/g,'');
+                a.download = `课堂笔记_${dateString}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // 清理
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // 显示保存成功提示
+                saveToast.classList.remove('translate-y-20', 'opacity-0');
+                saveToast.classList.add('translate-y-0', 'opacity-100');
+                
+                // 3秒后隐藏提示
+                setTimeout(() => {
+                    saveToast.classList.add('translate-y-20', 'opacity-0');
+                    saveToast.classList.remove('translate-y-0', 'opacity-100');
+                }, 3000);
+            } else {
+                alert('没有可保存的内容');
+            }
+        }
+
+        // 清空文本
+        function clearText() {
+            if (confirm('确定要清空识别结果吗？')) {
+                fullText = '';
+                updateFullText('');
+                resultContainer.innerHTML = '<div class="text-gray-400 italic text-center py-16"><i class="fa fa-file-text-o text-4xl mb-3 block opacity-30"></i><p>识别的文字将显示在这里...</p></div>';
+                updateLastUpdateTime();
+            }
+        }
+
+        // 复制邮箱
+        function copyEmail() {
+            const email = emailAddress.textContent;
+            navigator.clipboard.writeText(email).then(() => {
+                // 显示复制成功提示
+                emailToast.classList.remove('translate-y-20', 'opacity-0');
+                emailToast.classList.add('translate-y-0', 'opacity-100');
+                
+                // 3秒后隐藏提示
+                setTimeout(() => {
+                    emailToast.classList.add('translate-y-20', 'opacity-0');
+                    emailToast.classList.remove('translate-y-0', 'opacity-100');
+                }, 3000);
+                
+                // 关闭弹窗
+                contactModal.classList.add('hidden');
+                contactModal.classList.remove('flex');
+            }).catch(err => {
+                console.error(`[错误] 无法复制邮箱: ${err}`);
+                alert('复制失败，请手动复制邮箱地址。');
+            });
+        }
+
+        // 事件监听
+        startBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+        
+        saveBtn.addEventListener('click', saveText);
+        copyBtn.addEventListener('click', copyToClipboard);
+        clearBtn.addEventListener('click', clearText);
+        
+        // 帮助弹窗控制
+        helpBtn.addEventListener('click', () => {
+            helpModal.classList.remove('hidden');
+            helpModal.classList.add('flex');
+        });
+        
+        closeHelp.addEventListener('click', () => {
+            helpModal.classList.add('hidden');
+            helpModal.classList.remove('flex');
+        });
+        
+        // 点击弹窗外部关闭
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) {
+                helpModal.classList.add('hidden');
+                helpModal.classList.remove('flex');
+            }
+        });
+        
+        // 联系我弹窗控制
+        contactBtn.addEventListener('click', () => {
+            contactModal.classList.remove('hidden');
+            contactModal.classList.add('flex');
+        });
+        
+        contactModal.addEventListener('click', (e) => {
+            if (e.target === contactModal) {
+                contactModal.classList.add('hidden');
+                contactModal.classList.remove('flex');
+            }
+        });
+        
+        copyEmailBtn.addEventListener('click', copyEmail);
+
+        // 页面加载时尝试连接WebSocket
+        window.addEventListener('load', () => {
+            connectWS();
+            updateLastUpdateTime();
+        });
+
+        // 页面关闭时确保关闭连接和录音
+        window.addEventListener('beforeunload', () => {
+            if (ws) {
+                ws.close();
+            }
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        });
+    </script>
+</body>
+</html>
